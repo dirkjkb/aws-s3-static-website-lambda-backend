@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Static website hosting with S3 and Lambda backend
+
+Parameters:
+  S3HostingBucketName:
+    Type: String
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        ErrorDocument: error.html
+        IndexDocument: index.html
+      BucketName: !Ref S3HostingBucketName
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+      Bucket: !Ref S3Bucket
+
+  BackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/hello_lambda/
+      Handler: app.handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          CORS_ALLOW_ORIGIN: !GetAtt [S3Bucket, WebsiteURL]
+      Events:
+        GetData:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+
+Outputs:
+  BucketName:
+    Value: !Ref S3HostingBucketName
+    Description: Bucket Name
+
+  WebsiteURL:
+    Value: !GetAtt [S3Bucket, WebsiteURL]
+    Description: Website URL
+
+  BackendURL:
+    Description: REST Api URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
